@@ -91,10 +91,9 @@ export function TripMap({ plan, selectedId, onSelect, heatmap, showHeat, metric,
     <MapContainer center={center} zoom={4} minZoom={3} preferCanvas zoomControl={false} className="map" worldCopyJump>
       <ZoomControl position="topright" />
       <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        subdomains="abcd"
-        maxZoom={19}
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+        attribution="Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors"
+        maxZoom={16}
       />
       {heatmap && showHeat && <HeatmapOverlay data={heatmap} metric={metric} hour={hour} />}
       {plan && <RouteLayers plan={plan} selectedId={selectedId} onSelect={onSelect} />}
