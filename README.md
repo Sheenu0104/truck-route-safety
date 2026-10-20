@@ -5,7 +5,7 @@ forecast weather at the time the truck will actually be at each point, the load 
 
 ![Route comparison with risk-colored route, heatmap and forecast timeline](docs/screenshot.png)
 
-**Live app:** https://truck-route-safety.onrender.com · **Walkthrough:** _add your Loom link here_
+**Live app:** https://truck-route-safety.onrender.com · **Walkthrough:** (https://drive.google.com/file/d/1STk1_RewdSenJuqWdicLHd63V5zsdVJL/view?usp=sharing)
 
 ## What it does
 
