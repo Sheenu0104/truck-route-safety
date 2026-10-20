@@ -20,11 +20,12 @@ log = logging.getLogger(__name__)
 class UpstreamError(Exception):
     """A third-party API failed or returned something unusable."""
 
-    def __init__(self, service: str, message: str, payload: Any = None):
+    def __init__(self, service: str, message: str, payload: Any = None, status: int | None = None):
         super().__init__(f"{service}: {message}")
         self.service = service
         self.message = message
         self.payload = payload
+        self.status = status
 
 
 _session: requests.Session | None = None
@@ -51,7 +52,14 @@ def _get_session() -> requests.Session:
         return _session
 
 
-def get_json(url: str, params: dict[str, Any], *, service: str, cache_ttl: int | None = None) -> Any:
+def get_json(
+    url: str,
+    params: dict[str, Any],
+    *,
+    service: str,
+    cache_ttl: int | None = None,
+    headers: dict[str, str] | None = None,
+) -> Any:
     """GET a JSON document, caching successful responses for `cache_ttl` seconds."""
     key = None
     if cache_ttl:
@@ -62,7 +70,7 @@ def get_json(url: str, params: dict[str, Any], *, service: str, cache_ttl: int |
             return cached
 
     try:
-        response = _get_session().get(url, params=params, timeout=cfg("HTTP_TIMEOUT_S"))
+        response = _get_session().get(url, params=params, headers=headers, timeout=cfg("HTTP_TIMEOUT_S"))
     except requests.RequestException as exc:
         log.warning("%s request failed: %s", service, exc)
         raise UpstreamError(service, f"request failed ({exc.__class__.__name__})") from exc
@@ -76,7 +84,9 @@ def get_json(url: str, params: dict[str, Any], *, service: str, cache_ttl: int |
         reason = None
         if isinstance(data, dict):
             reason = data.get("reason") or data.get("message") or data.get("error")
-        raise UpstreamError(service, f"HTTP {response.status_code}: {reason or response.reason}", payload=data)
+        raise UpstreamError(
+            service, f"HTTP {response.status_code}: {reason or response.reason}", payload=data, status=response.status_code
+        )
     if data is None:
         raise UpstreamError(service, "response was not valid JSON")
 

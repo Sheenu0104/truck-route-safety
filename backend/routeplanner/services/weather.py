@@ -11,15 +11,20 @@ Snowfall is converted to inches of snow per hour.
 """
 from __future__ import annotations
 
+import logging
 import math
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Sequence
 
+from django.core.cache import cache
+
 from ..conf import cfg
 from ..domain.geo import LatLng
 from .http import UpstreamError, get_json
+
+log = logging.getLogger(__name__)
 
 HOUR_S = 3600
 BATCH_SIZE = 50  # locations per Open-Meteo request
@@ -106,15 +111,34 @@ class HourlySeries:
         )
 
 
+OPEN_METEO_PAUSED_KEY = "weather:open-meteo-paused"
+OPEN_METEO_PAUSE_S = 3600
+
+
 def fetch_hourly(points: Sequence[LatLng], start_ts: float, end_ts: float) -> list[HourlySeries]:
     """One hourly series per input point covering [start_ts, end_ts].
 
-    Points within ~1 km of each other share a forecast (the model grid is
-    coarser than that), which keeps the number of API calls down.
+    Open-Meteo is the primary source. Its free tier has a daily request cap
+    that is counted per IP address, and cloud hosts share IPs between many
+    apps, so when it refuses (429), errors or times out the request falls back
+    to MET Norway. After a 429, Open-Meteo is skipped for an hour.
     """
     if not points:
         return []
     start, end = floor_hour(start_ts), ceil_hour(end_ts)
+    if not cache.get(OPEN_METEO_PAUSED_KEY):
+        try:
+            return _fetch_open_meteo(points, start, end)
+        except UpstreamError as exc:
+            log.warning("Open-Meteo failed (%s); falling back to MET Norway", exc)
+            if exc.status == 429:
+                cache.set(OPEN_METEO_PAUSED_KEY, True, OPEN_METEO_PAUSE_S)
+    return met_norway.fetch_hourly(points, start, end)
+
+
+def _fetch_open_meteo(points: Sequence[LatLng], start: int, end: int) -> list[HourlySeries]:
+    """Points within ~1 km of each other share a forecast (the model grid is
+    coarser than that), which keeps the number of API calls down."""
     keys = [(round(lat, 2), round(lng, 2)) for lat, lng in points]
     unique = list(dict.fromkeys(keys))
     batches = [unique[i : i + BATCH_SIZE] for i in range(0, len(unique), BATCH_SIZE)]
@@ -179,3 +203,7 @@ def parse_location(item: dict) -> HourlySeries:
         temp=temps if temp_unit_f else [None if t is None else t * 9 / 5 + 32 for t in temps],
         code=[None if c is None else int(c) for c in (hourly.get("weather_code") or [None] * len(times))],
     )
+
+
+# Imported last: met_norway builds HourlySeries objects defined above.
+from . import met_norway  # noqa: E402
