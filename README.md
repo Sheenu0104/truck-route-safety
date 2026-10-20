@@ -5,7 +5,7 @@ forecast weather at the time the truck will actually be at each point, the load 
 
 ![Route comparison with risk-colored route, heatmap and forecast timeline](docs/screenshot.png)
 
-**Live app:** _add your Render URL here_ · **Walkthrough:** _add your Loom link here_
+**Live app:** https://truck-route-safety.onrender.com · **Walkthrough:** _add your Loom link here_
 
 ## What it does
 
@@ -61,6 +61,7 @@ Open-Meteo reports values differently by type, so the app samples them different
 - **Rain** (`rain` + `showers`) and **snowfall** are totals over the preceding hour, which makes them a rate in in/hr. The app uses the hour bucket that contains the ETA.
 - Units are requested in mph and inches. The response's units are still checked and converted, so a metric response can't silently break the thresholds.
 - Points within about 1 km share a forecast, and locations are batched 50 per request in parallel. Responses are cached for 15 minutes.
+- **Backup source.** Open-Meteo's free tier has a daily cap per IP address, and free cloud hosts share IPs between many apps. If Open-Meteo refuses, errors or times out, the app switches to MET Norway's free Locationforecast API ([`met_norway.py`](backend/routeplanner/services/met_norway.py)). After a rate-limit error it skips Open-Meteo for an hour. MET Norway reports total precipitation only, so it is split into rain or snow using the forecast's symbol code ("snow", "sleet"), or the temperature when there is none. Snow depth uses 1 mm of water = 0.7 cm of snow.
 
 ## ETA model
 
@@ -87,10 +88,10 @@ backend/
   config/                  Django settings, URLs, WSGI
   routeplanner/
     domain/                pure logic, no I/O: risk.py, scoring.py, geo.py, hos.py
-    services/              external APIs + orchestration: routing, weather, geocoding, planner, heatmap
+    services/              external APIs + orchestration: routing, weather (+ MET Norway backup), geocoding, planner, heatmap
     validation.py          request parsing
     views.py               JSON endpoints
-    tests/                 53 unit and API tests (network is mocked)
+    tests/                 62 unit and API tests (network is mocked)
 frontend/src/
   App.tsx                  state and data flow
   components/              form, route cards, checkpoint table, timeline
@@ -135,7 +136,7 @@ cd backend && python manage.py test routeplanner
 cd frontend && npm run build          # type-check and production build
 ```
 
-No API keys are needed. OSRM, Open-Meteo, Photon and the CARTO base map are all free.
+No API keys are needed. OSRM, Open-Meteo, Photon and the Esri light-grey base map are all free.
 
 ## Deploy (Render, one service)
 
